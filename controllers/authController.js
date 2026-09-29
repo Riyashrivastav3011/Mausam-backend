@@ -1,63 +1,73 @@
 import User from '../models/auth.js'
-import  generateToken  from '../utils/generateToken.js'
 import bcrypt from 'bcrypt';
+import JWT from 'jsonwebtoken'
 
 
-export const createUser = async (req , res) => {
-  try{
-       const {name , email , password , mobile } = req.body;
-    const exist = await User.findOne({email});
-    if(exist){
-      return res.status(400).json({message:'Email already registered'});
-    }
-    const salt = await bcrypt.genSalt(10);
-    const hashed = await bcrypt.hash(password  , salt);
-     
-      const userData ={ name , email , mobile, password:hashed }    
-    
-     const user= await User.create(userData);
-     const token = generateToken(user._id , user.role);
-     
-     return res.status(200).json({messssage:'user created successfully' , token , user})
-  }
-  catch(err){
-    console.log(err);
-    res.status(400).json({message:'server error' , err});
-  } 
+//create user
+export const createUser = async (req , res) =>{
+    try{
+     const {name , email , mobile , password } = req.body;
+     const exist = await User.findOne({email})
+     if(exist){
+        return res.status(400).json({message:"Email already resgistered"})
+     }
+     const salt = await bcrypt.genSalt(10);
+     const hashed = await bcrypt.hash(password , salt);
+     const user = new User({name , email , mobile , password:hashed});
+     await user.save();
+     const secret = process.env.JWT_SECRET;
+     const token = JWT.sign({id:user._id , email:user.email} , secret , {expiresIn:'5d'});
+     res.cookie("token", token, {
+  httpOnly: true,
+  secure: true, 
+  sameSite: "none",
+  maxAge: 5 * 24 * 60 * 60 * 1000
+});
+     res.status(200).json({
+        success:true,
+        message:'user created',
+        token        
+     })
+    }catch (err) {
+  console.error("SIGNUP ERROR:", err);
+
+  res.status(500).json({
+    success: false,
+    message: "Creation failed",
+    error: err.message,
+  });
+}
 }
 
 
 export const loginUser = async (req , res) =>{
    try{
-     const {email , password} = req.body;
-    const user = await User.findOne({email})
-    if(!user){
-        return res.status(400).json({message:'invalid email'})
-    }
+const { email , password } = req.body;
+const user = await User.findOne({email});
 
-    const match = await bcrypt.compare(password , user.password);
-    if(!match){
-        return res.status(400).json({message:'invalid password'});
-    }
-
-    const token = generateToken(user._id , user.role);
-    
-    res.cookie('token' , token , {
-        httpOnly:true,
-        sameSite:'none',
-        secure:true,
-        maxAge: 24 * 60 * 60 * 1000 
-    });
-    console.log(token);
-    res.status(200).json({message:'logged in' , 
-      user:{email:user.email , role:user.role , name:user.name}})
-   }
-   catch(err){
-    console.log(err)
-    res.status(400).json({message:'server error' , err});
-   }
+if(!user){
+    return res.status(500).json({message:'invalid credentials'})
 }
+const match = await bcrypt.compare(password , user.password)
+if(!match){
+    return res.status(500).json({message:'invalid credentials'})
+} 
+ const token = JWT.sign({ id: user._id, email: user.email },
+ process.env.JWT_SECRET, { expiresIn: '1d' });
+ res.cookie('token' , token , {
+    httpOnly:true,
+    sameSite:'none',
+    secure:true,
+    maxAge: 24 * 60 * 60 * 1000 
+});
+res.status(200).json({
+    message:'logged in'})
 
+}catch(err){
+    console.log(err);
+    res.status(500).json({message:'server error'})
+}
+}
 
 // Locations sve
 export const saveLocation = async (req, res) => {

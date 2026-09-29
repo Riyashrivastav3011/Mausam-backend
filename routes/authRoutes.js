@@ -1,6 +1,6 @@
 import { createUser , loginUser , saveLocation , getLocation } from '../controllers/authController.js';
 import express from 'express'
-import verifyToken from '../utils/verifyToken.js'
+import verifyToken from '../middlewares/verifyToken.js'
 
 
 const router = express.Router();
